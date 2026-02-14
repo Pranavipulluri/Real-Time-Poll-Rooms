@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getPoll, votePoll } from '../services/api';
 import { getSocket } from '../services/socket';
@@ -14,6 +14,23 @@ function Poll() {
 
   // Anti-abuse Mechanism #1: localStorage check
   const STORAGE_KEY = `voted_poll_${id}`;
+
+  const loadPoll = useCallback(async () => {
+    try {
+      const data = await getPoll(id);
+      setPoll(data);
+      
+      // If backend says user has voted, mark as voted
+      if (data.hasVoted) {
+        setHasVoted(true);
+        localStorage.setItem(STORAGE_KEY, 'true');
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to load poll');
+    } finally {
+      setLoading(false);
+    }
+  }, [id, STORAGE_KEY]);
 
   useEffect(() => {
     // Check localStorage for previous vote
@@ -39,24 +56,7 @@ function Poll() {
       socket.emit('leavePoll', id);
       socket.off('pollUpdate');
     };
-  }, [id]);
-
-  const loadPoll = async () => {
-    try {
-      const data = await getPoll(id);
-      setPoll(data);
-      
-      // If backend says user has voted, mark as voted
-      if (data.hasVoted) {
-        setHasVoted(true);
-        localStorage.setItem(STORAGE_KEY, 'true');
-      }
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load poll');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [id, STORAGE_KEY, loadPoll]);
 
   const handleVote = async () => {
     if (selectedOption === null || hasVoted || voting) return;
